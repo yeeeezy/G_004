@@ -1,0 +1,16 @@
+.idea
+/3rdParty
+/cmake-build*
+/cmake-build-debug
+/cmake-build-release
+/build
+/build-test
+/.vscode
+/Examples/Platform_Windows/ViGEmAdapter/ViGEmClient-master/*
+*.log
+*.user
+*.swp
+*.swo
+.DS_Store
+*.exe
+*.dll
