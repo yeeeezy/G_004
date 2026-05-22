@@ -1,0 +1,43 @@
+# Unreal Engine
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Visual Studio
+.vs/
+.vsconfig
+
+# JetBrains Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled source
+*.pdb
+*.exp
+*.lib
+*.dll
+*.exe
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*_backup*
+
+# Shader intermediate files
+ShaderWarmup/
+
+# Crash reports
+CrashReportClient/
