@@ -48,6 +48,12 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Sensitivity")
     float GamepadLookSensitivity = 150.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Settings")
+    float MouseLookSensitivity = 1.0f;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gravity Settings")
+    float GyroGravitySensitivity = 150.0f;
+    
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* JumpAction;
 
