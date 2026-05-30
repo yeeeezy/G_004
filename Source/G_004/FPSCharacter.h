@@ -41,6 +41,13 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* LookAction;
 
+    // 鼠标视角（Mouse XY 2D-Axis），与手柄摇杆分开以便独立设置灵敏度
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    UInputAction* MouseLookAction;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Sensitivity")
+    float GamepadLookSensitivity = 150.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* JumpAction;
 
@@ -80,11 +87,13 @@ protected:
     float CurrentCameraPitch;
 
     // ---------------- 【内部工具函数】 ----------------
+    virtual void BeginPlay() override;
     FVector SnapVectorToClosestAxis(const FVector& InVector);
 
     // ---------------- 【输入处理函数】 ----------------
     void Move(const FInputActionValue& Value);
-    void Look(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);       // 手柄右摇杆
+    void MouseLook(const FInputActionValue& Value);  // 鼠标
     void InputGyroData(const FInputActionValue& Value);
     void GyroGravityStarted();
     void GyroGravityCompleted();

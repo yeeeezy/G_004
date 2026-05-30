@@ -41,3 +41,8 @@ ShaderWarmup/
 
 # Crash reports
 CrashReportClient/
+
+# AI tooling (local only, not for version control)
+.agents/
+skills-lock.json
+CLAUDE.md

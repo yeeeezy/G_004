@@ -16,8 +16,12 @@ AFPSCharacter::AFPSCharacter()
 
     // ================= 【核心改动 1：彻底关闭原生的世界坐标视角绑定】 =================
     bUseControllerRotationPitch = false;
-    bUseControllerRotationYaw = false;  // 必须是 false！我们要在 Look 里手动转动身体
+    bUseControllerRotationYaw = false;
     bUseControllerRotationRoll = false;
+
+    // FPS 角色手动控制朝向，必须关闭——否则 CMC 在 MOVE_Walking 下每帧覆盖 Actor 旋转，
+    // 导致 AddActorLocalRotation 的视角输入被抵消，初始状态右摇杆左右无效。
+    GetCharacterMovement()->bOrientRotationToMovement = false;
 
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
@@ -48,6 +52,24 @@ AFPSCharacter::AFPSCharacter()
     SmoothRotationSpeed = 10.0f; 
 }
 
+void AFPSCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ================= 【核心修复：防止蓝图默认值覆盖】 =================
+    // 强制关闭 Pawn 的 Controller 旋转绑定，防止蓝图默认值覆盖 C++ 构造函数
+    // 解决初始重力朝下时，右摇杆（Yaw）无法转动视角的问题
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationYaw = false; 
+    bUseControllerRotationRoll = false;
+
+    // Blueprint 类默认值在构造函数之后应用，必须在 BeginPlay 里强制覆盖，
+    // 否则 BP_FPSCharacter 的 OrientRotationToMovement=true 会每帧覆盖 AddActorLocalRotation
+    GetCharacterMovement()->bOrientRotationToMovement = false;
+    GetCharacterMovement()->bUseControllerDesiredRotation = false;
+    // ====================================================================
+}
+
 void AFPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
@@ -56,6 +78,10 @@ void AFPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
         EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFPSCharacter::Move);
         EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFPSCharacter::Look);
+        if (MouseLookAction)
+        {
+            EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AFPSCharacter::MouseLook);
+        }
 
         if (GyroDataAction)
         {
@@ -214,28 +240,39 @@ void AFPSCharacter::Move(const FInputActionValue& Value)
 
 void AFPSCharacter::Look(const FInputActionValue& Value)
 {
+    // 手柄右摇杆：原始值在 [-1, 1]，需要乘以帧率无关的灵敏度系数
     if (bIsShiftingGravity || bIsSmoothRotating) return;
 
-    FVector2D LookAxisVector = Value.Get<FVector2D>();
+    FVector2D Axis = Value.Get<FVector2D>();
     if (Controller != nullptr)
     {
-        // ================= 【核心改动 2：躯干-颈椎解耦的纯局部视角控制】 =================
-        
-        // 1. 左右看 (Yaw)：直接给 Actor（身体躯干）施加局部旋转！
-        // 这样身体就会跟着视线一起转，完美解决重力改变后身体不转导致方向错乱的问题。
-        float YawInput = LookAxisVector.X * 1.0f; 
-        AddActorLocalRotation(FRotator(0.f, YawInput, 0.f));
+        float YawInput   =  Axis.X * GamepadLookSensitivity * GetWorld()->GetDeltaSeconds();
+        float PitchInput = -Axis.Y * GamepadLookSensitivity * GetWorld()->GetDeltaSeconds();
 
-        // 2. 上下看 (Pitch)：单独计算相机的局部俯仰角。
-        float PitchInput = LookAxisVector.Y * -1.0f; 
-        CurrentCameraPitch += PitchInput;
-        
-        // 限制在 -89 到 89 度之间，防止后仰断脖子
-        CurrentCameraPitch = FMath::Clamp(CurrentCameraPitch, -89.0f, 89.0f);
+        // ================= 【核心优化：使用四元数直接旋转 Actor】 =================
+        // 免疫多向重力下的欧拉角死锁，直接绕角色当前的局部向上向量 (UpVector) 旋转
+        FQuat YawRotation(FVector::UpVector, FMath::DegreesToRadians(YawInput));
+        AddActorLocalRotation(YawRotation);
+        // =========================================================================
 
-        // 只更新相机的相对 Pitch，Yaw 和 Roll 严格设为 0
+        CurrentCameraPitch = FMath::Clamp(CurrentCameraPitch + PitchInput, -89.0f, 89.0f);
         FirstPersonCamera->SetRelativeRotation(FRotator(CurrentCameraPitch, 0.f, 0.f));
+    }
+}
 
-        // ==============================================================================
+void AFPSCharacter::MouseLook(const FInputActionValue& Value)
+{
+    // 鼠标：Enhanced Input 已经处理好像素 delta，直接用即可
+    if (bIsShiftingGravity || bIsSmoothRotating) return;
+
+    FVector2D Axis = Value.Get<FVector2D>();
+    if (Controller != nullptr)
+    {
+        // 鼠标由于是纯 Delta，转成四元数也能保持多向重力下的稳定性，统一逻辑
+        FQuat YawRotation(FVector::UpVector, FMath::DegreesToRadians(Axis.X));
+        AddActorLocalRotation(YawRotation);
+
+        CurrentCameraPitch = FMath::Clamp(CurrentCameraPitch + (-Axis.Y), -89.0f, 89.0f);
+        FirstPersonCamera->SetRelativeRotation(FRotator(CurrentCameraPitch, 0.f, 0.f));
     }
 }
